@@ -2,9 +2,9 @@ package server
 
 import (
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"micro/demo/rpc"
 	"net"
 	"reflect"
 )
@@ -16,7 +16,7 @@ const numOfLengthBytes = 8
 type Server struct {
 	network string
 	addr    string
-	service map[string]Service
+	service map[string]reflectionStub
 }
 
 // InitServer 初始化服务端
@@ -24,13 +24,16 @@ func InitServer(network, addr string) *Server {
 	return &Server{
 		network: network,
 		addr:    addr,
-		service: make(map[string]Service, 16),
+		service: make(map[string]reflectionStub, 16),
 	}
 }
 
 // RegisterService 服务注册
 func (s *Server) RegisterService(service Service) {
-	s.service[service.Name()] = service
+	s.service[service.Name()] = reflectionStub{
+		svc:   service,
+		value: reflect.ValueOf(service),
+	}
 }
 
 // Start 服务器启动
@@ -63,39 +66,27 @@ func (s *Server) Start() error {
 // 请求数据：根据长度字段确定
 func (s *Server) handleConn(conn net.Conn) error {
 	for {
-		// 读数据：读数据根据上层协议决定怎么读
-		// 例如，简单的RPC协议一般是分成两段读，先读头部，
-		// 根据头部得知Body有多长，再把剩下的数据集读出来
-		byteLen := make([]byte, numOfLengthBytes)
-		_, err := conn.Read(byteLen)
+		// 读取请求消息
+		reqBytes, err := rpc.ReadMsg(conn)
 		if err != nil {
 			return err
 		}
-		// 根据消息长度读数据
-		length := binary.BigEndian.Uint64(byteLen)
-		reqBytes := make([]byte, length)
-		_, err = conn.Read(reqBytes)
+
+		// 还原调用信息
+		req := &Request{}
+		err = json.Unmarshal(reqBytes, req)
 		if err != nil {
 			return err
 		}
 
 		// TODO 处理数据
-		rspData, err := s.handleMsg(reqBytes)
+		resp, err := s.Invoke(context.Background(), req)
 		if err != nil {
-			// 业务err, 暂时忽略
 			return err
 		}
 
-		// 写回响应：即使处理数据错误，也要返回错误给客户端
-		// 不然客户端不知道处理出错
-		// data = rspLen的64位表示 + rspData
-		rspLen := len(rspData)
-		res := make([]byte, numOfLengthBytes+rspLen)
-
-		// 写入长度 + 数据
-		binary.BigEndian.PutUint64(res[:numOfLengthBytes], uint64(rspLen))
-		copy(res[numOfLengthBytes:], rspData)
-
+		// 编码数据
+		res := rpc.EncodeMsg(resp.Data)
 		_, err = conn.Write(res)
 		if err != nil {
 			return err
@@ -103,28 +94,36 @@ func (s *Server) handleConn(conn net.Conn) error {
 	}
 }
 
-// handleMsg 处理数据
-func (s *Server) handleMsg(reqData []byte) ([]byte, error) {
-	// 还原调用信息
-	req := &Request{}
-	err := json.Unmarshal(reqData, req)
-	if err != nil {
-		return nil, err
-	}
-
+func (s *Server) Invoke(ctx context.Context, req *Request) (*Response, error) {
 	// 根据调用信息，发起业务调用
 	service, ok := s.service[req.ServiceName]
 	if !ok {
 		return nil, errors.New("调用服务不存在")
 	}
 
+	// 反射出调用信息 执行调用
+	resp, err := service.invoke(ctx, req.MethodName, req.Arg)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Response{
+		Data: resp,
+	}, nil
+}
+
+type reflectionStub struct {
+	svc   Service
+	value reflect.Value
+}
+
+func (r *reflectionStub) invoke(ctx context.Context, methodName string, data []byte) ([]byte, error) {
 	// 反射找到方法，执行调用
-	val := reflect.ValueOf(service)
-	method := val.MethodByName(req.MethodName)
+	method := r.value.MethodByName(methodName)
 	in := make([]reflect.Value, 2)
 	in[0] = reflect.ValueOf(context.Background())
 	inReq := reflect.New(method.Type().In(1).Elem())
-	err = json.Unmarshal(req.Arg, inReq.Interface())
+	err := json.Unmarshal(data, inReq.Interface())
 	if err != nil {
 		return nil, err
 	}

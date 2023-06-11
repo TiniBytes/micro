@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/stretchr/testify/assert"
 	"log"
-	"micro/rpc/server"
+	"micro/demo/rpc/server"
 	"testing"
 	"time"
 )
@@ -35,8 +35,7 @@ func TestInitClientProxy(t *testing.T) {
 	}, resp)
 }
 
-type UserServiceServer struct {
-}
+type UserServiceServer struct{}
 
 func (u *UserServiceServer) Name() string {
 	return "user-service"

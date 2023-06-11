@@ -2,7 +2,6 @@ package client
 
 import "context"
 
-// test ---------------------------------
 type Req struct {
 	ID int
 }

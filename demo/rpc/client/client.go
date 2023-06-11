@@ -2,9 +2,10 @@ package client
 
 import (
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"github.com/silenceper/pool"
+	"micro/demo/rpc"
 	"net"
 	"reflect"
 	"time"
@@ -14,7 +15,10 @@ import (
 // 为函数类型字段赋值
 func InitClientProxy(addr string, service Service) error {
 	// 初始化proxy
-	client := NewClient(addr)
+	client, err := NewClient(addr)
+	if err != nil {
+		return err
+	}
 
 	return setFuncField(service, client)
 }
@@ -83,12 +87,31 @@ const numOfLengthBytes = 8
 
 type Client struct {
 	addr string
+	pool pool.Pool
 }
 
-func NewClient(addr string) *Client {
+func NewClient(addr string) (*Client, error) {
+	p, err := pool.NewChannelPool(&pool.Config{
+		InitialCap: 1,
+		MaxCap:     30,
+		MaxIdle:    10,
+		Factory: func() (interface{}, error) {
+			return net.DialTimeout("tcp", addr, 3*time.Second)
+		},
+		Close: func(i interface{}) error {
+			return i.(net.Conn).Close()
+		},
+		Ping:        nil,
+		IdleTimeout: time.Minute,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	return &Client{
 		addr: addr,
-	}
+		pool: p,
+	}, nil
 }
 
 // Invoke 发送请求到服务端
@@ -98,8 +121,12 @@ func (c *Client) Invoke(ctx context.Context, req *Request) (*Response, error) {
 		return nil, err
 	}
 
-	// 新建一个连接
-	conn, err := net.DialTimeout("tcp", c.addr, 3*time.Second)
+	// 从连接池拿一个连接
+	val, err := c.pool.Get()
+	if err != nil {
+		return nil, err
+	}
+	conn := val.(net.Conn)
 	resp, err := c.Send(conn, data)
 	if err != nil {
 		return nil, err
@@ -112,33 +139,13 @@ func (c *Client) Invoke(ctx context.Context, req *Request) (*Response, error) {
 
 // Send 向服务端发送数据
 func (c *Client) Send(conn net.Conn, data []byte) ([]byte, error) {
-	// 封装数据
-	reqLen := len(data)
-	req := make([]byte, numOfLengthBytes+reqLen)
-	// 写入长度 + 数据
-	binary.BigEndian.PutUint64(req[:numOfLengthBytes], uint64(reqLen))
-	copy(req[numOfLengthBytes:], data)
-
-	// 发送数据
+	// 写入数据
+	req := rpc.EncodeMsg(data)
 	_, err := conn.Write(req)
 	if err != nil {
 		return nil, err
 	}
 
-	// 接收响应
-	byteLen := make([]byte, numOfLengthBytes)
-	_, err = conn.Read(byteLen) // 读取长度
-	if err != nil {
-		return nil, err
-	}
-
-	// 根据长度读数据
-	length := binary.BigEndian.Uint64(byteLen)
-	res := make([]byte, length)
-	_, err = conn.Read(res) // 根据长度读数据
-	if err != nil {
-		return nil, err
-	}
-
-	return res, err
+	// 接收响应数据
+	return rpc.ReadMsg(conn)
 }

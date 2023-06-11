@@ -2,7 +2,7 @@ package client
 
 import (
 	"fmt"
-	"micro/net/server"
+	"micro/demo/net/server"
 	"testing"
 	"time"
 )
