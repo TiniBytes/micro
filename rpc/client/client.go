@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/silenceper/pool"
 	"micro/demo/rpc"
+	"micro/rpc/protocol"
 	"net"
 	"reflect"
 	"time"
@@ -13,7 +14,7 @@ import (
 
 // InitClientProxy 初始化客户端代理
 // 为函数类型字段赋值
-func InitClientProxy(addr string, service Service) error {
+func InitClientProxy(addr string, service protocol.Service) error {
 	// 初始化proxy
 	client, err := NewClient(addr)
 	if err != nil {
@@ -24,7 +25,7 @@ func InitClientProxy(addr string, service Service) error {
 }
 
 // setFuncField 捕捉本地调用
-func setFuncField(service Service, p Proxy) error {
+func setFuncField(service protocol.Service, p protocol.Proxy) error {
 	if service == nil {
 		return errors.New("rpc: 不支持nil")
 	}
@@ -56,7 +57,7 @@ func setFuncField(service Service, p Proxy) error {
 				if err != nil {
 					return []reflect.Value{retVal, reflect.ValueOf(err)}
 				}
-				req := &Request{
+				req := &protocol.Request{
 					ServiceName: service.Name(),
 					MethodName:  fieldTyp.Name,
 					Data:        reqData,
@@ -115,7 +116,7 @@ func NewClient(addr string) (*Client, error) {
 }
 
 // Invoke 发送请求到服务端
-func (c *Client) Invoke(ctx context.Context, req *Request) (*Response, error) {
+func (c *Client) Invoke(ctx context.Context, req *protocol.Request) (*protocol.Response, error) {
 	data, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -132,7 +133,7 @@ func (c *Client) Invoke(ctx context.Context, req *Request) (*Response, error) {
 		return nil, err
 	}
 
-	return &Response{
+	return &protocol.Response{
 		Data: resp,
 	}, nil
 }

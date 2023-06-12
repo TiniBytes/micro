@@ -1,4 +1,4 @@
-package client
+package protocol
 
 import "context"
 
@@ -8,14 +8,4 @@ type Service interface {
 
 type Proxy interface {
 	Invoke(ctx context.Context, req *Request) (*Response, error)
-}
-
-type Request struct {
-	ServiceName string
-	MethodName  string
-	Data        []byte
-}
-
-type Response struct {
-	Data []byte
 }
