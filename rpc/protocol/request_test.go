@@ -23,11 +23,42 @@ func TestEncodeDecode(t *testing.T) {
 				Serializer:  14,
 				ServiceName: "user-service",
 				MethodName:  "GetByID",
-				//Meta: map[string]string{
-				//	"trace-id": "123456",
-				//	"a/b":      "a",
-				//},
-				//Data: []byte("hello, word"),
+				Meta: map[string]string{
+					"trace-id": "123456",
+					"a/b":      "a",
+				},
+				Data: []byte("hello, word"),
+			},
+		},
+		{
+			name: "case2_no mata with data",
+			req: &Request{
+				//HeadLength:  24,
+				//BodyLength:  48,
+				MessageID:   11,
+				Version:     12,
+				Compress:    13,
+				Serializer:  14,
+				ServiceName: "user-service",
+				MethodName:  "GetByID",
+				Data:        []byte("hello, word"),
+			},
+		},
+		{
+			name: "case3_no data with meta",
+			req: &Request{
+				//HeadLength:  24,
+				//BodyLength:  48,
+				MessageID:   11,
+				Version:     12,
+				Compress:    13,
+				Serializer:  14,
+				ServiceName: "user-service",
+				MethodName:  "GetByID",
+				Meta: map[string]string{
+					"trace-id": "123456",
+					"a/b":      "a",
+				},
 			},
 		},
 	}
@@ -46,7 +77,14 @@ func TestEncodeDecode(t *testing.T) {
 }
 
 func (r *Request) calculateHeaderLength() {
-	r.HeadLength = 15 + uint32(len(r.ServiceName)) + uint32(len(r.MethodName)) + 2
+	headLen := 15 + len(r.ServiceName) + len(r.MethodName) + 2
+	for key, value := range r.Meta {
+		headLen += len(key)
+		headLen++
+		headLen += len(value)
+		headLen++
+	}
+	r.HeadLength = uint32(headLen)
 }
 
 func (r *Request) calculateBodyLength() {

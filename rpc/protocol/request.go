@@ -57,6 +57,18 @@ func EncodeRequest(req *Request) []byte {
 	cur[len(req.MethodName)] = splitter
 	cur = cur[len(req.MethodName)+1:]
 
+	for key, value := range req.Meta {
+		copy(cur, key)
+		cur[len(key)] = pairSplitter
+		cur = cur[len(key)+1:]
+
+		copy(cur, value)
+		cur[len(value)] = splitter
+		cur = cur[len(value)+1:]
+	}
+
+	copy(cur, req.Data)
+
 	return data
 }
 
@@ -79,15 +91,36 @@ func DecodeRequest(data []byte) *Request {
 	data = data[1:]
 
 	request.Serializer = data[0]
-	data = data[1:]
+	header := data[1 : request.HeadLength-14]
 
-	index := bytes.IndexByte(data, splitter)
-	request.ServiceName = string(data[:index])
-	data = data[index+1:]
+	index := bytes.IndexByte(header, splitter)
+	request.ServiceName = string(header[:index])
+	header = header[index+1:]
 
-	index = bytes.IndexByte(data, splitter)
-	request.MethodName = string(data[:index])
-	data = data[index+1:]
+	index = bytes.IndexByte(header, splitter)
+	request.MethodName = string(header[:index])
+	header = header[index+1:]
+
+	index = bytes.IndexByte(header, splitter)
+	var meta map[string]string
+	if index != -1 {
+		meta = make(map[string]string, 0)
+	}
+	for index != -1 {
+		pair := header[:index]
+		pairIndex := bytes.IndexByte(pair, pairSplitter)
+		key := string(pair[:pairIndex])
+		value := string(pair[pairIndex+1:])
+		meta[key] = value
+
+		header = header[index+1:]
+		index = bytes.IndexByte(header, splitter)
+	}
+	request.Meta = meta
+
+	if request.BodyLength != 0 {
+		request.Data = data[request.HeadLength-14:]
+	}
 
 	return request
 }
