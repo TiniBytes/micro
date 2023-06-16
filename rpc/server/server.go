@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"micro/demo/rpc"
 	"micro/rpc/protocol"
 	"net"
 	"reflect"
@@ -54,7 +53,7 @@ func (s *Server) Start() error {
 
 		// 处理请求
 		go func() {
-			err := s.handleConn(conn)
+			err = s.handleConn(conn)
 			if err != nil {
 				_ = conn.Close()
 			}
@@ -68,14 +67,13 @@ func (s *Server) Start() error {
 func (s *Server) handleConn(conn net.Conn) error {
 	for {
 		// 读取请求消息
-		reqBytes, err := rpc.ReadMsg(conn)
+		reqBytes, err := protocol.ReadMsg(conn)
 		if err != nil {
 			return err
 		}
 
 		// 还原调用信息
-		req := &protocol.Request{}
-		err = json.Unmarshal(reqBytes, req)
+		req := protocol.DecodeRequest(reqBytes)
 		if err != nil {
 			return err
 		}
@@ -83,12 +81,13 @@ func (s *Server) handleConn(conn net.Conn) error {
 		// TODO 处理数据
 		resp, err := s.Invoke(context.Background(), req)
 		if err != nil {
-			return err
+			resp.Error = []byte(err.Error())
 		}
+		resp.CalculateHeaderLength()
+		resp.CalculateBodyLength()
 
 		// 编码数据
-		res := rpc.EncodeMsg(resp.Data)
-		_, err = conn.Write(res)
+		_, err = conn.Write(protocol.EncodeResponse(resp))
 		if err != nil {
 			return err
 		}
@@ -98,19 +97,26 @@ func (s *Server) handleConn(conn net.Conn) error {
 func (s *Server) Invoke(ctx context.Context, req *protocol.Request) (*protocol.Response, error) {
 	// 根据调用信息，发起业务调用
 	service, ok := s.service[req.ServiceName]
+	resp := &protocol.Response{
+		MessageID:  req.MessageID,
+		Version:    req.Version,
+		Compress:   req.Compress,
+		Serializer: req.Serializer,
+	}
+
+	// 捕获错误
 	if !ok {
-		return nil, errors.New("调用服务不存在")
+		return resp, errors.New("调用服务不存在")
 	}
 
 	// 反射出调用信息 执行调用
-	resp, err := service.invoke(ctx, req.MethodName, req.Data)
+	respData, err := service.invoke(ctx, req.MethodName, req.Data)
+	resp.Data = respData
 	if err != nil {
-		return nil, err
+		return resp, err
 	}
 
-	return &protocol.Response{
-		Data: resp,
-	}, nil
+	return resp, nil
 }
 
 type reflectionStub struct {
@@ -131,10 +137,21 @@ func (r *reflectionStub) invoke(ctx context.Context, methodName string, data []b
 	in[1] = inReq
 	// result[0]: 返回值    result[1]: error
 	results := method.Call(in)
+
 	if results[1].Interface() != nil {
-		return nil, results[1].Interface().(error)
+		err = results[1].Interface().(error)
 	}
 
+	var res []byte
+	if results[0].IsNil() {
+		return nil, err
+	} else {
+		var er error
+		res, er = json.Marshal(results[0].Interface())
+		if er != nil {
+			return nil, er
+		}
+	}
 	// 返回信息
-	return json.Marshal(results[0].Interface())
+	return res, err
 }

@@ -124,3 +124,18 @@ func DecodeRequest(data []byte) *Request {
 
 	return request
 }
+
+func (r *Request) CalculateHeaderLength() {
+	headLen := 15 + len(r.ServiceName) + len(r.MethodName) + 2
+	for key, value := range r.Meta {
+		headLen += len(key)
+		headLen++
+		headLen += len(value)
+		headLen++
+	}
+	r.HeadLength = uint32(headLen)
+}
+
+func (r *Request) CalculateBodyLength() {
+	r.BodyLength = uint32(len(r.Data))
+}

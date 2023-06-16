@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestEncodeDecode(t *testing.T) {
+func TestRequestEncodeDecode(t *testing.T) {
 	tests := []struct {
 		name string
 		req  *Request
@@ -65,8 +65,8 @@ func TestEncodeDecode(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			tc.req.calculateHeaderLength()
-			tc.req.calculateBodyLength()
+			tc.req.CalculateHeaderLength()
+			tc.req.CalculateBodyLength()
 
 			data := EncodeRequest(tc.req)
 			req := DecodeRequest(data)
@@ -74,19 +74,4 @@ func TestEncodeDecode(t *testing.T) {
 			assert.Equal(t, tc.req, req)
 		})
 	}
-}
-
-func (r *Request) calculateHeaderLength() {
-	headLen := 15 + len(r.ServiceName) + len(r.MethodName) + 2
-	for key, value := range r.Meta {
-		headLen += len(key)
-		headLen++
-		headLen += len(value)
-		headLen++
-	}
-	r.HeadLength = uint32(headLen)
-}
-
-func (r *Request) calculateBodyLength() {
-	r.BodyLength = uint32(len(r.Data))
 }

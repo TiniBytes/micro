@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/silenceper/pool"
-	"micro/demo/rpc"
 	"micro/rpc/protocol"
 	"net"
 	"reflect"
@@ -64,16 +63,32 @@ func setFuncField(service protocol.Service, p protocol.Proxy) error {
 				}
 
 				// 发起RPC调用
+				req.CalculateHeaderLength()
+				req.CalculateBodyLength()
 				resp, err := p.Invoke(ctx, req)
 				if err != nil {
 					return []reflect.Value{retVal, reflect.ValueOf(err)}
 				}
-				err = json.Unmarshal(resp.Data, retVal.Interface())
-				if err != nil {
-					return []reflect.Value{retVal, reflect.ValueOf(err)}
+
+				var retErr error
+				if len(resp.Error) > 0 {
+					retErr = errors.New(string(resp.Error))
+				}
+				if len(resp.Data) > 0 {
+					err = json.Unmarshal(resp.Data, retVal.Interface())
+					if err != nil {
+						// 反序列化的err
+						return []reflect.Value{retVal, reflect.ValueOf(err)}
+					}
 				}
 
-				return []reflect.Value{retVal, reflect.Zero(reflect.TypeOf(new(error)).Elem())}
+				var retErrVal reflect.Value
+				if retErr == nil {
+					retErrVal = reflect.Zero(reflect.TypeOf(new(error)).Elem())
+				} else {
+					retErrVal = reflect.ValueOf(retErr)
+				}
+				return []reflect.Value{retVal, retErrVal}
 			}
 			// 设置值
 			fnVal := reflect.MakeFunc(fieldTyp.Type, fn)
@@ -117,36 +132,33 @@ func NewClient(addr string) (*Client, error) {
 
 // Invoke 发送请求到服务端
 func (c *Client) Invoke(ctx context.Context, req *protocol.Request) (*protocol.Response, error) {
-	data, err := json.Marshal(req)
+	data := protocol.EncodeRequest(req)
+
+	resp, err := c.Send(data)
 	if err != nil {
 		return nil, err
 	}
 
-	// 从连接池拿一个连接
+	return protocol.DecodeResponse(resp), nil
+}
+
+// Send 向服务端发送数据
+func (c *Client) Send(data []byte) ([]byte, error) {
 	val, err := c.pool.Get()
 	if err != nil {
 		return nil, err
 	}
 	conn := val.(net.Conn)
-	resp, err := c.Send(conn, data)
-	if err != nil {
-		return nil, err
-	}
+	defer func() {
+		_ = conn.Close()
+	}()
 
-	return &protocol.Response{
-		Data: resp,
-	}, nil
-}
-
-// Send 向服务端发送数据
-func (c *Client) Send(conn net.Conn, data []byte) ([]byte, error) {
 	// 写入数据
-	req := rpc.EncodeMsg(data)
-	_, err := conn.Write(req)
+	_, err = conn.Write(data)
 	if err != nil {
 		return nil, err
 	}
 
 	// 接收响应数据
-	return rpc.ReadMsg(conn)
+	return protocol.ReadMsg(conn)
 }
