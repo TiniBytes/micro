@@ -2,9 +2,10 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"micro/rpc/protocol"
+	"micro/rpc/serialize"
+	"micro/rpc/serialize/json"
 	"net"
 	"reflect"
 )
@@ -14,25 +15,38 @@ const numOfLengthBytes = 8
 
 // Server 服务端
 type Server struct {
-	network string
-	addr    string
-	service map[string]reflectionStub
+	network     string
+	addr        string
+	service     map[string]reflectionStub
+	serializers map[uint8]serialize.Serializer
 }
 
 // InitServer 初始化服务端
 func InitServer(network, addr string) *Server {
-	return &Server{
-		network: network,
-		addr:    addr,
-		service: make(map[string]reflectionStub, 16),
+	res := &Server{
+		network:     network,
+		addr:        addr,
+		service:     make(map[string]reflectionStub, 16),
+		serializers: make(map[uint8]serialize.Serializer, 4),
 	}
+
+	// 注册默认序列化协议
+	res.RegisterSerializer(&json.Serializer{})
+	return res
+}
+
+// RegisterSerializer 注册序列化协议
+func (s *Server) RegisterSerializer(serializer serialize.Serializer) {
+	// 传入具体实现的序列化协议结构体
+	s.serializers[serializer.Code()] = serializer
 }
 
 // RegisterService 服务注册
 func (s *Server) RegisterService(service protocol.Service) {
 	s.service[service.Name()] = reflectionStub{
-		svc:   service,
-		value: reflect.ValueOf(service),
+		svc:         service,
+		value:       reflect.ValueOf(service),
+		serializers: s.serializers,
 	}
 }
 
@@ -110,7 +124,7 @@ func (s *Server) Invoke(ctx context.Context, req *protocol.Request) (*protocol.R
 	}
 
 	// 反射出调用信息 执行调用
-	respData, err := service.invoke(ctx, req.MethodName, req.Data)
+	respData, err := service.invoke(ctx, req)
 	resp.Data = respData
 	if err != nil {
 		return resp, err
@@ -120,17 +134,23 @@ func (s *Server) Invoke(ctx context.Context, req *protocol.Request) (*protocol.R
 }
 
 type reflectionStub struct {
-	svc   protocol.Service
-	value reflect.Value
+	svc         protocol.Service
+	value       reflect.Value
+	serializers map[uint8]serialize.Serializer
 }
 
-func (r *reflectionStub) invoke(ctx context.Context, methodName string, data []byte) ([]byte, error) {
+func (r *reflectionStub) invoke(ctx context.Context, req *protocol.Request) ([]byte, error) {
 	// 反射找到方法，执行调用
-	method := r.value.MethodByName(methodName)
+	method := r.value.MethodByName(req.MethodName)
 	in := make([]reflect.Value, 2)
 	in[0] = reflect.ValueOf(context.Background())
 	inReq := reflect.New(method.Type().In(1).Elem())
-	err := json.Unmarshal(data, inReq.Interface())
+
+	serializer, ok := r.serializers[req.Serializer]
+	if !ok {
+		return nil, errors.New("micro: 不支持的序列化协议")
+	}
+	err := serializer.Decode(req.Data, inReq.Interface())
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +167,7 @@ func (r *reflectionStub) invoke(ctx context.Context, methodName string, data []b
 		return nil, err
 	} else {
 		var er error
-		res, er = json.Marshal(results[0].Interface())
+		res, er = serializer.Encode(results[0].Interface())
 		if er != nil {
 			return nil, er
 		}

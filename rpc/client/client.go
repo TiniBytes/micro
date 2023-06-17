@@ -2,10 +2,11 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"github.com/silenceper/pool"
 	"micro/rpc/protocol"
+	"micro/rpc/serialize"
+	"micro/rpc/serialize/json"
 	"net"
 	"reflect"
 	"time"
@@ -13,18 +14,18 @@ import (
 
 // InitClientProxy 初始化客户端代理
 // 为函数类型字段赋值
-func InitClientProxy(addr string, service protocol.Service) error {
+func InitClientProxy(addr string, service protocol.Service, opts ...ClientOption) error {
 	// 初始化proxy
-	client, err := NewClient(addr)
+	client, err := NewClient(addr, opts...)
 	if err != nil {
 		return err
 	}
 
-	return setFuncField(service, client)
+	return client.setFuncField(service, client)
 }
 
 // setFuncField 捕捉本地调用
-func setFuncField(service protocol.Service, p protocol.Proxy) error {
+func (c *Client) setFuncField(service protocol.Service, p protocol.Proxy) error {
 	if service == nil {
 		return errors.New("rpc: 不支持nil")
 	}
@@ -52,7 +53,8 @@ func setFuncField(service protocol.Service, p protocol.Proxy) error {
 				// args[0]: context   args[1]: req
 				ctx := args[0].Interface().(context.Context)
 
-				reqData, err := json.Marshal(args[1].Interface())
+				// 序列化
+				reqData, err := c.serializer.Encode(args[1].Interface())
 				if err != nil {
 					return []reflect.Value{retVal, reflect.ValueOf(err)}
 				}
@@ -60,6 +62,7 @@ func setFuncField(service protocol.Service, p protocol.Proxy) error {
 					ServiceName: service.Name(),
 					MethodName:  fieldTyp.Name,
 					Data:        reqData,
+					Serializer:  c.serializer.Code(),
 				}
 
 				// 发起RPC调用
@@ -75,7 +78,7 @@ func setFuncField(service protocol.Service, p protocol.Proxy) error {
 					retErr = errors.New(string(resp.Error))
 				}
 				if len(resp.Data) > 0 {
-					err = json.Unmarshal(resp.Data, retVal.Interface())
+					err = c.serializer.Decode(resp.Data, retVal.Interface())
 					if err != nil {
 						// 反序列化的err
 						return []reflect.Value{retVal, reflect.ValueOf(err)}
@@ -99,14 +102,21 @@ func setFuncField(service protocol.Service, p protocol.Proxy) error {
 	return nil
 }
 
-const numOfLengthBytes = 8
-
 type Client struct {
-	addr string
-	pool pool.Pool
+	addr       string
+	pool       pool.Pool
+	serializer serialize.Serializer
 }
 
-func NewClient(addr string) (*Client, error) {
+type ClientOption func(client *Client)
+
+func ClientWithSerializer(serializer serialize.Serializer) ClientOption {
+	return func(client *Client) {
+		client.serializer = serializer
+	}
+}
+
+func NewClient(addr string, opts ...ClientOption) (*Client, error) {
 	p, err := pool.NewChannelPool(&pool.Config{
 		InitialCap: 1,
 		MaxCap:     30,
@@ -124,10 +134,17 @@ func NewClient(addr string) (*Client, error) {
 		return nil, err
 	}
 
-	return &Client{
-		addr: addr,
-		pool: p,
-	}, nil
+	res := &Client{
+		addr:       addr,
+		pool:       p,
+		serializer: &json.Serializer{}, // 默认json序列化
+	}
+
+	// 配置选项
+	for _, opt := range opts {
+		opt(res)
+	}
+	return res, nil
 }
 
 // Invoke 发送请求到服务端

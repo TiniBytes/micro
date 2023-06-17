@@ -22,7 +22,7 @@ func TestRequestEncodeDecode(t *testing.T) {
 				Compress:    13,
 				Serializer:  14,
 				ServiceName: "user-service",
-				MethodName:  "GetByID",
+				MethodName:  "Get",
 				Meta: map[string]string{
 					"trace-id": "123456",
 					"a/b":      "a",
@@ -40,7 +40,7 @@ func TestRequestEncodeDecode(t *testing.T) {
 				Compress:    13,
 				Serializer:  14,
 				ServiceName: "user-service",
-				MethodName:  "GetByID",
+				MethodName:  "Get",
 				Data:        []byte("hello, word"),
 			},
 		},
@@ -54,7 +54,7 @@ func TestRequestEncodeDecode(t *testing.T) {
 				Compress:    13,
 				Serializer:  14,
 				ServiceName: "user-service",
-				MethodName:  "GetByID",
+				MethodName:  "Get",
 				Meta: map[string]string{
 					"trace-id": "123456",
 					"a/b":      "a",

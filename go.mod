@@ -14,5 +14,6 @@ require (
 	github.com/silenceper/pool v1.0.0 // indirect
 	github.com/sirupsen/logrus v1.4.2 // indirect
 	golang.org/x/sys v0.0.0-20190422165155-953cdadca894 // indirect
+	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
