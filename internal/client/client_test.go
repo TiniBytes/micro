@@ -5,8 +5,8 @@ import (
 	"errors"
 	"github.com/stretchr/testify/assert"
 	"micro/demo/proto"
+	"micro/internal/server"
 	proto2 "micro/rpc/serialize/proto"
-	"micro/rpc/server"
 	"testing"
 	"time"
 )
