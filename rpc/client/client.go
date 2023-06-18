@@ -58,11 +58,13 @@ func (c *Client) setFuncField(service protocol.Service, p protocol.Proxy) error 
 				if err != nil {
 					return []reflect.Value{retVal, reflect.ValueOf(err)}
 				}
+
+				// oneway元数据
 				req := &protocol.Request{
 					ServiceName: service.Name(),
 					MethodName:  fieldTyp.Name,
-					Data:        reqData,
 					Serializer:  c.serializer.Code(),
+					Data:        reqData,
 				}
 
 				// 发起RPC调用
@@ -149,9 +151,39 @@ func NewClient(addr string, opts ...ClientOption) (*Client, error) {
 
 // Invoke 发送请求到服务端
 func (c *Client) Invoke(ctx context.Context, req *protocol.Request) (*protocol.Response, error) {
-	data := protocol.EncodeRequest(req)
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
 
-	resp, err := c.Send(data)
+	ch := make(chan struct{})
+	defer func() {
+		close(ch)
+	}()
+	var (
+		resp *protocol.Response
+		err  error
+	)
+
+	// exec
+	go func() {
+		resp, err = c.doInvoke(ctx, req)
+		ch <- struct{}{}
+	}()
+
+	// client timeout control
+	select {
+	case <-ctx.Done():
+		// timeout
+		return nil, ctx.Err()
+	case <-ch:
+		return resp, err
+	}
+}
+
+// doInvoke 执行发送请求
+func (c *Client) doInvoke(ctx context.Context, req *protocol.Request) (*protocol.Response, error) {
+	data := protocol.EncodeRequest(req)
+	resp, err := c.Send(ctx, data)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +192,7 @@ func (c *Client) Invoke(ctx context.Context, req *protocol.Request) (*protocol.R
 }
 
 // Send 向服务端发送数据
-func (c *Client) Send(data []byte) ([]byte, error) {
+func (c *Client) Send(ctx context.Context, data []byte) ([]byte, error) {
 	val, err := c.pool.Get()
 	if err != nil {
 		return nil, err

@@ -148,6 +148,7 @@ func TestInitServiceProto(t *testing.T) {
 			resp, er := usClient.GetByIDProto(context.Background(), &proto.GetByIDReq{
 				Id: 1231313,
 			})
+
 			assert.Equal(t, tc.wantErr, er)
 			if resp != nil && resp.User != nil {
 				assert.Equal(t, tc.wantResp.Msg, resp.User.Name)
@@ -156,13 +157,4 @@ func TestInitServiceProto(t *testing.T) {
 		})
 	}
 
-	// 发起调用
-	//resp, err := usClient.Get(context.Background(), &Req{ID: 13})
-	//if err != nil {
-	//	return
-	//}
-	//
-	//assert.Equal(t, &Resp{
-	//	Msg: "hello,world",
-	//}, resp)
 }
