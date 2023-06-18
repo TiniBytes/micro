@@ -9,6 +9,7 @@ import (
 	"micro/rpc/serialize/json"
 	"net"
 	"reflect"
+	"strconv"
 	"time"
 )
 
@@ -59,11 +60,16 @@ func (c *Client) setFuncField(service protocol.Service, p protocol.Proxy) error 
 					return []reflect.Value{retVal, reflect.ValueOf(err)}
 				}
 
-				// oneway元数据
+				// timout control
+				meta := make(map[string]string, 1)
+				if deadline, ok := ctx.Deadline(); ok {
+					meta["deadline"] = strconv.FormatInt(deadline.UnixMilli(), 10)
+				}
 				req := &protocol.Request{
 					ServiceName: service.Name(),
 					MethodName:  fieldTyp.Name,
 					Serializer:  c.serializer.Code(),
+					Meta:        meta,
 					Data:        reqData,
 				}
 

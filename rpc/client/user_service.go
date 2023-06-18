@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"micro/demo/proto"
+	"testing"
+	"time"
 )
 
 type Req struct {
@@ -18,6 +20,7 @@ type Resp struct {
 type UserService struct {
 	Get          func(ctx context.Context, req *Req) (*Resp, error)
 	GetByIDProto func(ctx context.Context, req *proto.GetByIDReq) (*proto.GetByIDResp, error)
+	GetTimeout   func(ctx context.Context, req *proto.GetByIDReq) (*proto.GetByIDResp, error)
 }
 
 func (u UserService) Name() string {
@@ -47,4 +50,27 @@ func (u *UserServiceServer) GetByIDProto(ctx context.Context, req *proto.GetByID
 			Name: u.Msg,
 		},
 	}, u.Err
+}
+
+type UserServiceTimeout struct {
+	t     *testing.T
+	Err   error
+	Msg   string
+	sleep time.Duration
+}
+
+func (u *UserServiceTimeout) GetTimeout(ctx context.Context, req *proto.GetByIDReq) (*proto.GetByIDResp, error) {
+	if _, ok := ctx.Deadline(); ok {
+		u.t.Fatal("未设置超时")
+	}
+	time.Sleep(u.sleep)
+	return &proto.GetByIDResp{
+		User: &proto.User{
+			Name: u.Msg,
+		},
+	}, u.Err
+}
+
+func (u *UserServiceTimeout) Name() string {
+	return "user-service"
 }

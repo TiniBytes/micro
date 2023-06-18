@@ -8,6 +8,8 @@ import (
 	"micro/rpc/serialize/json"
 	"net"
 	"reflect"
+	"strconv"
+	"time"
 )
 
 // numOfLengthBytes 长度字段
@@ -92,8 +94,19 @@ func (s *Server) handleConn(conn net.Conn) error {
 			return err
 		}
 
+		// timeout control
+		ctx := context.Background()
+		cancel := func() {}
+		if deadlineStr, ok := req.Meta["deadline"]; ok {
+			if deadline, er := strconv.ParseInt(deadlineStr, 10, 64); er == nil {
+				t := time.UnixMilli(deadline)
+				ctx, cancel = context.WithDeadline(ctx, t)
+			}
+		}
+
 		// TODO 处理数据
-		resp, err := s.Invoke(req)
+		resp, err := s.Invoke(ctx, req)
+		cancel()
 		if err != nil {
 			resp.Error = []byte(err.Error())
 		}
@@ -108,7 +121,7 @@ func (s *Server) handleConn(conn net.Conn) error {
 	}
 }
 
-func (s *Server) Invoke(req *protocol.Request) (*protocol.Response, error) {
+func (s *Server) Invoke(ctx context.Context, req *protocol.Request) (*protocol.Response, error) {
 	// 根据调用信息，发起业务调用
 	service, ok := s.service[req.ServiceName]
 	resp := &protocol.Response{
@@ -124,7 +137,7 @@ func (s *Server) Invoke(req *protocol.Request) (*protocol.Response, error) {
 	}
 
 	// 反射出调用信息 执行调用
-	respData, err := service.invoke(req)
+	respData, err := service.invoke(ctx, req)
 	resp.Data = respData
 	if err != nil {
 		return resp, err
@@ -139,11 +152,11 @@ type reflectionStub struct {
 	serializers map[uint8]serialize.Serializer
 }
 
-func (r *reflectionStub) invoke(req *protocol.Request) ([]byte, error) {
+func (r *reflectionStub) invoke(ctx context.Context, req *protocol.Request) ([]byte, error) {
 	// 反射找到方法，执行调用
 	method := r.value.MethodByName(req.MethodName)
 	in := make([]reflect.Value, 2)
-	in[0] = reflect.ValueOf(context.Background())
+	in[0] = reflect.ValueOf(ctx)
 	inReq := reflect.New(method.Type().In(1).Elem())
 
 	serializer, ok := r.serializers[req.Serializer]

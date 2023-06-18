@@ -140,19 +140,30 @@ func TestInitServiceProto(t *testing.T) {
 			},
 			wantErr: errors.New("mock error"),
 		},
+		{
+			name: "case4_timeout",
+			mock: func() {
+				service.Err = nil
+				service.Msg = "hello,world"
+			},
+			wantResp: &Resp{
+				Msg: "hello,world",
+			},
+			wantErr: context.DeadlineExceeded,
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.mock()
-			resp, er := usClient.GetByIDProto(context.Background(), &proto.GetByIDReq{
+			ctx, _ := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
+			resp, er := usClient.GetByIDProto(ctx, &proto.GetByIDReq{
 				Id: 1231313,
 			})
 
 			assert.Equal(t, tc.wantErr, er)
 			if resp != nil && resp.User != nil {
 				assert.Equal(t, tc.wantResp.Msg, resp.User.Name)
-
 			}
 		})
 	}
