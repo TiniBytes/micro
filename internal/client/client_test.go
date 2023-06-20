@@ -19,7 +19,8 @@ func TestInitClientProxy(t *testing.T) {
 		err := svc.Start()
 		t.Log(err)
 	}()
-	time.Sleep(3 * time.Second)
+
+	//time.Sleep(3 * time.Second)
 
 	// 客户端
 	usClient := &UserService{}
