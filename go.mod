@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/silenceper/pool v1.0.0
 	github.com/stretchr/testify v1.8.4
-	google.golang.org/grpc v1.56.0
+	google.golang.org/grpc v1.56.1
 	google.golang.org/protobuf v1.30.0
 )
 
