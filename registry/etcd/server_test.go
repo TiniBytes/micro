@@ -18,20 +18,28 @@ func TestRegistryEtcd(t *testing.T) {
 	require.NoError(t, err)
 
 	us := &UserServer{}
-	server, err := micro.NewServer("user-service", micro.ServerWithRegister(registry))
+
+	server, err := micro.NewServer("user-service",
+		micro.ServerWithRegister(registry),
+		micro.ServerWithGroup("A"),
+	)
+	require.NoError(t, err)
 	proto.RegisterUserServiceServer(server, us)
 
 	// 调用start，以为us准备好
 	err = server.Start("127.0.0.1:8080")
+
 	t.Log(err)
 }
 
 type UserServer struct {
+	group string
 	proto.UnimplementedUserServiceServer
 }
 
 func (s *UserServer) GetByID(ctx context.Context, request *proto.Request) (*proto.Response, error) {
 	fmt.Println(request)
+	fmt.Println(s.group)
 	return &proto.Response{
 		User: &proto.User{
 			Id:   1,

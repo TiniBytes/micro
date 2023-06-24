@@ -16,6 +16,7 @@ type Registry interface {
 type ServiceInstance struct {
 	Name    string
 	Address string
+	Group   string
 	Meta    map[string]string
 }
 

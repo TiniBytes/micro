@@ -2,6 +2,7 @@ package micro
 
 import (
 	"context"
+	"google.golang.org/grpc/attributes"
 	"google.golang.org/grpc/resolver"
 	"micro/registry"
 	"sync"
@@ -65,7 +66,8 @@ func (r *RegistryResolver) resolve() {
 	address := make([]resolver.Address, 0, len(instances))
 	for _, si := range instances {
 		address = append(address, resolver.Address{
-			Addr: si.Address,
+			Addr:       si.Address,
+			Attributes: attributes.New("group", si.Group),
 		})
 	}
 
