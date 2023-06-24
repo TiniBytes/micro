@@ -1,24 +1,23 @@
-package round_robin
+package random
 
 import (
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/balancer/base"
-	"sync/atomic"
+	"math/rand"
 )
 
 type Balancer struct {
 	connections []balancer.SubConn
-	index       int32
 	len         int32
 }
 
 func (b *Balancer) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
-	if len(b.connections) == 0 {
+	if b.len == 0 {
 		return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
 	}
 
-	idx := atomic.AddInt32(&b.index, 1)
-	conn := b.connections[idx%b.len]
+	r := rand.Intn(int(b.len))
+	conn := b.connections[r]
 
 	return balancer.PickResult{
 		SubConn: conn,
@@ -36,9 +35,9 @@ func (b *Builder) Build(info base.PickerBuildInfo) balancer.Picker {
 	for conn := range info.ReadySCs {
 		connections = append(connections, conn)
 	}
+
 	return &Balancer{
 		connections: connections,
-		index:       -1,
 		len:         int32(len(connections)),
 	}
 }

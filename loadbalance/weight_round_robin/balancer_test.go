@@ -8,10 +8,10 @@ import (
 )
 
 func TestWeightBalancer_Pick(t *testing.T) {
-	b := WeightBalancer{
+	b := Balancer{
 		connections: []*weightConn{
 			{
-				c: SubConn{
+				conn: SubConn{
 					name: "weight-5",
 				},
 				weight:          5,
@@ -19,7 +19,7 @@ func TestWeightBalancer_Pick(t *testing.T) {
 				currentWeight:   5,
 			},
 			{
-				c: SubConn{
+				conn: SubConn{
 					name: "weight-4",
 				},
 				weight:          4,
@@ -27,7 +27,7 @@ func TestWeightBalancer_Pick(t *testing.T) {
 				currentWeight:   4,
 			},
 			{
-				c: SubConn{
+				conn: SubConn{
 					name: "weight-3",
 				},
 				weight:          3,

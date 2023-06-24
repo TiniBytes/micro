@@ -1,25 +1,25 @@
-package round_robin
+package hash
 
 import (
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/balancer/base"
-	"sync/atomic"
+	"hash/crc32"
 )
 
 type Balancer struct {
 	connections []balancer.SubConn
-	index       int32
 	len         int32
 }
 
 func (b *Balancer) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
-	if len(b.connections) == 0 {
+	if b.len == 0 {
 		return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
 	}
 
-	idx := atomic.AddInt32(&b.index, 1)
-	conn := b.connections[idx%b.len]
+	hashCode := info.Ctx.Value("hash_code").([]byte)
+	idx := int(crc32.ChecksumIEEE(hashCode))
 
+	conn := b.connections[idx]
 	return balancer.PickResult{
 		SubConn: conn,
 		Done: func(info balancer.DoneInfo) {
@@ -36,9 +36,9 @@ func (b *Builder) Build(info base.PickerBuildInfo) balancer.Picker {
 	for conn := range info.ReadySCs {
 		connections = append(connections, conn)
 	}
+
 	return &Balancer{
 		connections: connections,
-		index:       -1,
 		len:         int32(len(connections)),
 	}
 }

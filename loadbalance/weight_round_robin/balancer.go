@@ -4,16 +4,15 @@ import (
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/balancer/base"
 	"math"
-	"strconv"
 	"sync"
 )
 
-type WeightBalancer struct {
+type Balancer struct {
 	connections []*weightConn
 	mutex       sync.Mutex
 }
 
-func (w *WeightBalancer) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
+func (w *Balancer) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
 	if len(w.connections) == 0 {
 		return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
 	}
@@ -36,7 +35,7 @@ func (w *WeightBalancer) Pick(info balancer.PickInfo) (balancer.PickResult, erro
 	res.mutex.Unlock()
 
 	return balancer.PickResult{
-		SubConn: res.c,
+		SubConn: res.conn,
 		Done: func(info balancer.DoneInfo) {
 			w.mutex.Lock()
 			if info.Err != nil && res.efficientWeight == 0 {
@@ -56,35 +55,30 @@ func (w *WeightBalancer) Pick(info balancer.PickInfo) (balancer.PickResult, erro
 	}, nil
 }
 
-type WeightBalancerBuilder struct {
-}
+type BalancerBuilder struct{}
 
-func (w *WeightBalancerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
+func (w *BalancerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
 	connections := make([]*weightConn, 0, len(info.ReadySCs))
 
 	for sub, subInfo := range info.ReadySCs {
-		weightStr := subInfo.Address.Attributes.Value("weight").(string)
-		weight, err := strconv.ParseInt(weightStr, 10, 64)
-		if err != nil {
-			panic(err)
-		}
+		weight := subInfo.Address.Attributes.Value("weight").(int32)
 
 		// 全部初始化为weight
 		connections = append(connections, &weightConn{
-			c:               sub,
+			conn:            sub,
 			weight:          uint32(weight),
 			currentWeight:   uint32(weight),
 			efficientWeight: uint32(weight),
 		})
 	}
 
-	return &WeightBalancer{
+	return &Balancer{
 		connections: connections,
 	}
 }
 
 type weightConn struct {
-	c               balancer.SubConn
+	conn            balancer.SubConn
 	weight          uint32
 	currentWeight   uint32
 	efficientWeight uint32
