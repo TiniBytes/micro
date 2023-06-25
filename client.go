@@ -50,7 +50,7 @@ func ClientWithPickBuilder(name string, b base.PickerBuilder) ClientOption {
 	}
 }
 
-func (c *Client) Dial(ctx context.Context, serviceName string) (*grpc.ClientConn, error) {
+func (c *Client) Dial(ctx context.Context, serviceName string, options ...grpc.DialOption) (*grpc.ClientConn, error) {
 	var opts []grpc.DialOption
 	if c.registry != nil {
 		builder, err := NewRegistryBuilder(c.registry, c.timeout)
@@ -67,6 +67,10 @@ func (c *Client) Dial(ctx context.Context, serviceName string) (*grpc.ClientConn
 
 	if c.insecure {
 		opts = append(opts, grpc.WithInsecure())
+	}
+
+	if len(options) != 0 {
+		opts = append(opts, options...)
 	}
 
 	cc, err := grpc.DialContext(ctx, fmt.Sprintf("registry:///%s", serviceName), opts...)

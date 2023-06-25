@@ -4,12 +4,14 @@ import (
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/balancer/base"
 	"math"
+	"micro/route"
 	"sync"
 )
 
 type Balancer struct {
 	connections []*weightConn
 	mutex       sync.Mutex
+	filter      route.Filter
 }
 
 func (w *Balancer) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
@@ -55,7 +57,9 @@ func (w *Balancer) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
 	}, nil
 }
 
-type BalancerBuilder struct{}
+type BalancerBuilder struct {
+	Filter route.Filter
+}
 
 func (w *BalancerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
 	connections := make([]*weightConn, 0, len(info.ReadySCs))
