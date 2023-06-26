@@ -3,6 +3,7 @@ module micro
 go 1.20
 
 require (
+	github.com/pkg/errors v0.8.1
 	github.com/silenceper/pool v1.0.0
 	github.com/stretchr/testify v1.8.4
 	go.etcd.io/etcd/client/v3 v3.5.9
