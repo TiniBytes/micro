@@ -46,5 +46,6 @@ func (f *FixWindowLimiter) BuildServerInterceptor() grpc.UnaryServerInterceptor 
 }
 
 func (f *FixWindowLimiter) allow(ctx context.Context) (bool, error) {
-	return f.client.Eval(ctx, luaFixWindow, []string{f.service}).Bool()
+	return f.client.Eval(ctx, luaFixWindow, []string{f.service},
+		f.interval.Milliseconds(), f.rate).Bool()
 }

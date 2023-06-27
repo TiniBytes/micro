@@ -7,8 +7,8 @@ if val == false then
         -- 执行限流
         return "false"
     else
-        -- set service 1 px 100s
-        redis.call('set', KEYS[1], 1, 'px', expiration)
+        -- set user-service 1 px 100s
+        redis.call('set', KEYS[1], 1, 'PX', expiration)
         return "true"
     end
 elseif tonumber(val) < allow then
