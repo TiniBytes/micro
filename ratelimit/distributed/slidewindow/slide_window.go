@@ -1,4 +1,4 @@
-package redis
+package slidewindow
 
 import (
 	_ "embed"
@@ -6,6 +6,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"micro/ratelimit/distributed/fixwindow"
 	"time"
 )
 
@@ -19,8 +20,8 @@ type SlideWindowLimiter struct {
 	service  string
 }
 
-func NewSlideWindowLimiter(client redis.Cmdable, interval time.Duration, rate int, service string) *FixWindowLimiter {
-	return &FixWindowLimiter{
+func NewSlideWindowLimiter(client redis.Cmdable, interval time.Duration, rate int, service string) *fixwindow.Limiter {
+	return &fixwindow.Limiter{
 		client:   client,
 		interval: interval,
 		rate:     rate,

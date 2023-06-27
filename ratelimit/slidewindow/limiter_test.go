@@ -1,4 +1,4 @@
-package ratelimit
+package slidewindow
 
 import (
 	"github.com/pkg/errors"
@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-func TestNewLeakyBucketLimiter(t *testing.T) {
-	interceptor := NewFixWindowLimiter(3*time.Second, 1).BuildServerInterceptor()
+func TestNewLimiter(t *testing.T) {
+	interceptor := NewLimiter(3*time.Second, 1).BuildServerInterceptor()
 	cnt := 0
 
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
@@ -33,5 +33,4 @@ func TestNewLeakyBucketLimiter(t *testing.T) {
 	resp, err = interceptor(context.Background(), proto.GetByIDReq{}, &grpc.UnaryServerInfo{}, handler)
 	require.NoError(t, err)
 	require.Equal(t, &proto.GetByIDResp{}, resp)
-
 }

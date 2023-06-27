@@ -1,4 +1,4 @@
-package ratelimit
+package tokenbucket
 
 import (
 	"context"
@@ -11,10 +11,10 @@ import (
 	"time"
 )
 
-func TestTokenBucketLimiter_BuildServerInterceptor(t *testing.T) {
+func TestLimiter_BuildServerInterceptor(t *testing.T) {
 	tests := []struct {
 		name     string
-		b        func() *TokenBucketLimiter
+		b        func() *Limiter
 		ctx      context.Context
 		handler  func(ctx context.Context, req interface{}) (interface{}, error)
 		wantResp any
@@ -22,10 +22,10 @@ func TestTokenBucketLimiter_BuildServerInterceptor(t *testing.T) {
 	}{
 		{
 			name: "case1_err",
-			b: func() *TokenBucketLimiter {
+			b: func() *Limiter {
 				closeChan := make(chan struct{})
 				close(closeChan)
-				return &TokenBucketLimiter{
+				return &Limiter{
 					tokens: make(chan struct{}),
 					close:  closeChan,
 				}
@@ -35,10 +35,10 @@ func TestTokenBucketLimiter_BuildServerInterceptor(t *testing.T) {
 		},
 		{
 			name: "case2_context_cancel",
-			b: func() *TokenBucketLimiter {
+			b: func() *Limiter {
 				closeChan := make(chan struct{})
 				close(closeChan)
-				return &TokenBucketLimiter{
+				return &Limiter{
 					tokens: make(chan struct{}),
 					close:  closeChan,
 				}
@@ -52,10 +52,10 @@ func TestTokenBucketLimiter_BuildServerInterceptor(t *testing.T) {
 		},
 		{
 			name: "case2_get_token",
-			b: func() *TokenBucketLimiter {
+			b: func() *Limiter {
 				ch := make(chan struct{}, 1)
 				ch <- struct{}{}
-				return &TokenBucketLimiter{
+				return &Limiter{
 					tokens: ch,
 					close:  make(chan struct{}),
 				}
@@ -82,8 +82,8 @@ func TestTokenBucketLimiter_BuildServerInterceptor(t *testing.T) {
 	}
 }
 
-func TestNewTokenBucketLimiter(t *testing.T) {
-	limiter := NewTokenBucketLimiter(10, 2*time.Second)
+func TestNewLimiter(t *testing.T) {
+	limiter := NewLimiter(10, 2*time.Second)
 	defer func() {
 		_ = limiter.Close()
 	}()

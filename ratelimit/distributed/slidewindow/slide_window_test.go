@@ -1,4 +1,4 @@
-package redis
+package slidewindow
 
 import (
 	"github.com/pkg/errors"

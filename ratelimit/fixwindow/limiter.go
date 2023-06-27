@@ -1,4 +1,4 @@
-package ratelimit
+package fixwindow
 
 import (
 	"errors"
@@ -8,15 +8,15 @@ import (
 	"time"
 )
 
-type FixWindowLimiter struct {
+type Limiter struct {
 	timestamp int64
 	interval  int64
 	rate      int64
 	cnt       int64
 }
 
-func NewFixWindowLimiter(interval time.Duration, rate int64) *FixWindowLimiter {
-	return &FixWindowLimiter{
+func NewLimiter(interval time.Duration, rate int64) *Limiter {
+	return &Limiter{
 		timestamp: time.Now().UnixNano(),
 		interval:  interval.Nanoseconds(),
 		rate:      rate,
@@ -24,7 +24,7 @@ func NewFixWindowLimiter(interval time.Duration, rate int64) *FixWindowLimiter {
 	}
 }
 
-func (f *FixWindowLimiter) BuildServerInterceptor() grpc.UnaryServerInterceptor {
+func (f *Limiter) BuildServerInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 		// window reset
 		current := time.Now().UnixNano()

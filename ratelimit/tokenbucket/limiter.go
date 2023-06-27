@@ -1,4 +1,4 @@
-package ratelimit
+package tokenbucket
 
 import (
 	"golang.org/x/net/context"
@@ -7,12 +7,12 @@ import (
 	"time"
 )
 
-type TokenBucketLimiter struct {
+type Limiter struct {
 	tokens chan struct{}
 	close  chan struct{}
 }
 
-func NewTokenBucketLimiter(capacity int, interval time.Duration) *TokenBucketLimiter {
+func NewLimiter(capacity int, interval time.Duration) *Limiter {
 	ch := make(chan struct{}, capacity)
 	closeCh := make(chan struct{})
 
@@ -32,13 +32,13 @@ func NewTokenBucketLimiter(capacity int, interval time.Duration) *TokenBucketLim
 		}
 	}()
 
-	return &TokenBucketLimiter{
+	return &Limiter{
 		tokens: ch,
 		close:  closeCh,
 	}
 }
 
-func (t *TokenBucketLimiter) BuildServerInterceptor() grpc.UnaryServerInterceptor {
+func (t *Limiter) BuildServerInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 
 		select {
@@ -57,7 +57,7 @@ func (t *TokenBucketLimiter) BuildServerInterceptor() grpc.UnaryServerIntercepto
 	}
 }
 
-func (t *TokenBucketLimiter) Close() error {
+func (t *Limiter) Close() error {
 	once := sync.Once{}
 	once.Do(func() {
 		close(t.close)

@@ -1,4 +1,4 @@
-package ratelimit
+package leakylimiter
 
 import (
 	"golang.org/x/net/context"
@@ -6,17 +6,17 @@ import (
 	"time"
 )
 
-type LeakyBucketLimiter struct {
+type Limiter struct {
 	producer *time.Ticker
 }
 
-func NewLeakyBucketLimiter(interval time.Duration) *LeakyBucketLimiter {
-	return &LeakyBucketLimiter{
+func NewLimiter(interval time.Duration) *Limiter {
+	return &Limiter{
 		producer: time.NewTicker(interval),
 	}
 }
 
-func (l *LeakyBucketLimiter) BuildServerInterceptor() grpc.UnaryServerInterceptor {
+func (l *Limiter) BuildServerInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 		select {
 		case <-l.producer.C:
@@ -29,7 +29,7 @@ func (l *LeakyBucketLimiter) BuildServerInterceptor() grpc.UnaryServerIntercepto
 	}
 }
 
-func (l *LeakyBucketLimiter) Close() error {
+func (l *Limiter) Close() error {
 	l.producer.Stop()
 	return nil
 }

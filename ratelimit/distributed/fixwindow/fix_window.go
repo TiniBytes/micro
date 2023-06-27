@@ -1,4 +1,4 @@
-package redis
+package fixwindow
 
 import (
 	"context"
@@ -12,15 +12,15 @@ import (
 //go:embed lua/fix_window.lua
 var luaFixWindow string
 
-type FixWindowLimiter struct {
+type Limiter struct {
 	client   redis.Cmdable
 	interval time.Duration
 	rate     int
 	service  string
 }
 
-func NewFixWindowLimiter(client redis.Cmdable, interval time.Duration, rate int, service string) *FixWindowLimiter {
-	return &FixWindowLimiter{
+func NewLimiter(client redis.Cmdable, interval time.Duration, rate int, service string) *Limiter {
+	return &Limiter{
 		client:   client,
 		interval: interval,
 		rate:     rate,
@@ -28,7 +28,7 @@ func NewFixWindowLimiter(client redis.Cmdable, interval time.Duration, rate int,
 	}
 }
 
-func (f *FixWindowLimiter) BuildServerInterceptor() grpc.UnaryServerInterceptor {
+func (f *Limiter) BuildServerInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 		// 不同限流粒度
 		allow, err := f.allow(ctx)
@@ -45,7 +45,7 @@ func (f *FixWindowLimiter) BuildServerInterceptor() grpc.UnaryServerInterceptor 
 	}
 }
 
-func (f *FixWindowLimiter) allow(ctx context.Context) (bool, error) {
+func (f *Limiter) allow(ctx context.Context) (bool, error) {
 	return f.client.Eval(ctx, luaFixWindow, []string{f.service},
 		f.interval.Milliseconds(), f.rate).Bool()
 }

@@ -1,4 +1,4 @@
-package redis
+package fixwindow
 
 import (
 	"github.com/pkg/errors"
@@ -11,11 +11,11 @@ import (
 	"time"
 )
 
-func TestFixWindowLimiter(t *testing.T) {
+func TestLimiter(t *testing.T) {
 	client := redis.NewClient(&redis.Options{
 		Addr: "127.0.0.1:6379",
 	})
-	interceptor := NewFixWindowLimiter(client, 3*time.Second, 1, "user-service").BuildServerInterceptor()
+	interceptor := NewLimiter(client, 3*time.Second, 1, "user-service").BuildServerInterceptor()
 	cnt := 0
 
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {

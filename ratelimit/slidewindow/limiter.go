@@ -1,4 +1,4 @@
-package ratelimit
+package slidewindow
 
 import (
 	"container/list"
@@ -9,15 +9,15 @@ import (
 	"time"
 )
 
-type SlideWindowLimiter struct {
+type Limiter struct {
 	queue    *list.List
 	interval int64
 	rate     int
 	mutex    sync.Mutex
 }
 
-func NewSlideWindowLimiter(interval time.Duration, rate int) *SlideWindowLimiter {
-	return &SlideWindowLimiter{
+func NewLimiter(interval time.Duration, rate int) *Limiter {
+	return &Limiter{
 		queue:    list.New(),
 		interval: interval.Nanoseconds(),
 		rate:     rate,
@@ -25,7 +25,7 @@ func NewSlideWindowLimiter(interval time.Duration, rate int) *SlideWindowLimiter
 	}
 }
 
-func (s *SlideWindowLimiter) BuildServerInterceptor() grpc.UnaryServerInterceptor {
+func (s *Limiter) BuildServerInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 		now := time.Now().UnixNano()
 		boundary := now - s.interval
