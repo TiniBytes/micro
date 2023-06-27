@@ -1,4 +1,4 @@
--- 限流设置
+-- 固定窗口限流
 local val = redis.call('get', KEYS[1])
 local expiration = ARGV[1]
 local allow = tonumber(ARGV[2])
