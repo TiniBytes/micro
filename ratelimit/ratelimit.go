@@ -4,6 +4,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"micro/middleware"
 )
 
 type Limiter interface {
@@ -19,6 +20,18 @@ func NewServerLimiter(limiter Limiter) grpc.ServerOption {
 func NewClientLimiter(limiter Limiter) grpc.DialOption {
 	interceptor := BuildClientInterceptor(limiter)
 	return grpc.WithUnaryInterceptor(interceptor)
+}
+
+func ServerLimiter(limiter Limiter) middleware.Middleware {
+	return func(handler middleware.Handler) middleware.Handler {
+		return func(ctx context.Context, info interface{}) (reply interface{}, err error) {
+			if !limiter.Allow() {
+				return nil, errors.New("rate-limit")
+			}
+			reply, err = handler(ctx, info)
+			return
+		}
+	}
 }
 
 func BuildServerInterceptor(limiter Limiter) grpc.UnaryServerInterceptor {

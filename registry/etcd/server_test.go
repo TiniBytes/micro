@@ -7,6 +7,7 @@ import (
 	"golang.org/x/net/context"
 	"micro"
 	"micro/demo/grpc/proto"
+	"micro/middleware"
 	"testing"
 )
 
@@ -22,8 +23,13 @@ func TestRegistryEtcd(t *testing.T) {
 	server, err := micro.NewServer("user-service",
 		micro.ServerWithRegister(registry),
 		micro.ServerWithGroup("A"),
-		micro.ServerWithMiddleware(func() {
-			fmt.Println("AOP-拦截器")
+		micro.ServerWithMiddleware(func(handler middleware.Handler) middleware.Handler {
+			return func(ctx context.Context, info interface{}) (interface{}, error) {
+				fmt.Println("before")
+				reply, err := handler(ctx, info)
+				fmt.Println("after")
+				return reply, err
+			}
 		}),
 	)
 	require.NoError(t, err)

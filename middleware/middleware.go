@@ -1,19 +1,33 @@
 package middleware
 
 import (
-	"golang.org/x/net/context"
+	"context"
 	"google.golang.org/grpc"
 )
 
-type HandleFunc func(ctx ...grpc.UnaryServerInterceptor) grpc.UnaryServerInterceptor
+type Handler func(ctx context.Context, info interface{}) (reply interface{}, err error)
 
-// Middleware 函数式责任链模式
-type Middleware func()
+type Middleware func(handler Handler) Handler
 
-func BuildServerInterceptor(middleware Middleware) grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
-		middleware()
-		resp, err = handler(ctx, req)
-		return
+func Chain(m ...Middleware) Middleware {
+	return func(next Handler) Handler {
+		for i := len(m) - 1; i >= 0; i-- {
+			next = m[i](next)
+		}
+		return next
+	}
+}
+
+func BuildServerInterceptor(m []Middleware) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		h := func(ctx context.Context, req interface{}) (reply interface{}, err error) {
+			return handler(ctx, req)
+		}
+
+		if len(m) > 0 {
+			h = Chain(m...)(h)
+		}
+		reply, err := h(ctx, req)
+		return reply, err
 	}
 }

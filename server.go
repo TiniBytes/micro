@@ -41,13 +41,18 @@ func NewServer(name string, opts ...ServerOption) (*Server, error) {
 }
 
 func (s *Server) middlewareOption() []grpc.ServerOption {
-	var ans []grpc.ServerOption
-	for _, middle := range s.middleware {
-		interceptor := middleware.BuildServerInterceptor(middle)
-		option := grpc.UnaryInterceptor(interceptor)
-		ans = append(ans, option)
+	unary := []grpc.UnaryServerInterceptor{
+		middleware.BuildServerInterceptor(s.middleware),
 	}
-	return ans
+	stream := []grpc.StreamServerInterceptor{
+		// TODO
+	}
+
+	opts := []grpc.ServerOption{
+		grpc.ChainUnaryInterceptor(unary...),
+		grpc.ChainStreamInterceptor(stream...),
+	}
+	return opts
 }
 
 // Start 调用start任务服务准备好, 开始注册
