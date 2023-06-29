@@ -1,8 +1,7 @@
-package fixwindow
+package leakylimiter
 
 import (
 	"github.com/pkg/errors"
-	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -12,13 +11,12 @@ import (
 	"time"
 )
 
-func TestLimiter(t *testing.T) {
-	client := redis.NewClient(&redis.Options{
-		Addr: "127.0.0.1:6379",
-	})
-	limiter := NewLimiter(client, 3*time.Second, 1, "user-service")
+func TestNewLimiter(t *testing.T) {
+	limiter := NewLimiter(3 * time.Second)
 	interceptor := ratelimit.BuildServerInterceptor(limiter)
+	//interceptor := NewLimiter(3*time.Second, 1).BuildServerInterceptor()
 	cnt := 0
+	time.Sleep(3 * time.Second)
 
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		cnt++

@@ -1,8 +1,6 @@
 package tokenbucket
 
 import (
-	"golang.org/x/net/context"
-	"google.golang.org/grpc"
 	"sync"
 	"time"
 )
@@ -12,8 +10,29 @@ type Limiter struct {
 	close  chan struct{}
 }
 
+func (l *Limiter) Allow() bool {
+	select {
+	case <-l.close:
+		// No current limit on
+		return true
+	case <-l.tokens:
+		// Get the token
+		return true
+	default:
+		return false
+	}
+}
+
+func (l *Limiter) Close() {
+	once := sync.Once{}
+	once.Do(func() {
+		close(l.close)
+	})
+}
+
 func NewLimiter(capacity int, interval time.Duration) *Limiter {
 	ch := make(chan struct{}, capacity)
+	ch <- struct{}{}
 	closeCh := make(chan struct{})
 
 	producer := time.NewTicker(interval)
@@ -36,32 +55,4 @@ func NewLimiter(capacity int, interval time.Duration) *Limiter {
 		tokens: ch,
 		close:  closeCh,
 	}
-}
-
-func (t *Limiter) BuildServerInterceptor() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
-
-		select {
-		case <-t.close:
-			// No current limit on
-			resp, err = handler(ctx, req)
-		case <-t.tokens:
-			// Get the token
-			resp, err = handler(ctx, req)
-		case <-ctx.Done():
-			// Trigger current limit
-			err = ctx.Err()
-			return
-		}
-		return
-	}
-}
-
-func (t *Limiter) Close() error {
-	once := sync.Once{}
-	once.Do(func() {
-		close(t.close)
-	})
-
-	return nil
 }

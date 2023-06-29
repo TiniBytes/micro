@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"micro/demo/proto"
+	"micro/ratelimit"
 	"testing"
 	"time"
 )
@@ -71,7 +72,7 @@ func TestLimiter_BuildServerInterceptor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			interceptor := tt.b().BuildServerInterceptor()
+			interceptor := ratelimit.BuildServerInterceptor(tt.b())
 			resp, err := interceptor(tt.ctx, proto.GetByIDReq{}, &grpc.UnaryServerInfo{}, tt.handler)
 			assert.Equal(t, tt.wantErr.Error(), err.Error())
 			if err != nil {
@@ -85,9 +86,10 @@ func TestLimiter_BuildServerInterceptor(t *testing.T) {
 func TestNewLimiter(t *testing.T) {
 	limiter := NewLimiter(10, 2*time.Second)
 	defer func() {
-		_ = limiter.Close()
+		limiter.Close()
 	}()
-	interceptor := limiter.BuildServerInterceptor()
+
+	interceptor := ratelimit.BuildServerInterceptor(limiter)
 	cnt := 0
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		cnt++
@@ -102,6 +104,6 @@ func TestNewLimiter(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*10)
 	defer cancel()
 	resp, err = interceptor(ctx, proto.GetByIDReq{}, &grpc.UnaryServerInfo{}, handler)
-	require.Equal(t, context.DeadlineExceeded, err)
+	require.Equal(t, errors.New("rate-limit").Error(), err.Error())
 	require.Nil(t, resp)
 }

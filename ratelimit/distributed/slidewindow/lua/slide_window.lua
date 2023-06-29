@@ -1,6 +1,6 @@
 -- 滑动窗口限流
 local key = KEYS[1]
-local window = tonumber(AVGR[1])
+local window = tonumber(ARGV[1])
 local threshold = tonumber(ARGV[2])
 local now = tonumber(ARGV[3])
 local begin = now - window

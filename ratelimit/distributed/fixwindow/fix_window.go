@@ -3,9 +3,7 @@ package fixwindow
 import (
 	"context"
 	_ "embed"
-	"errors"
 	"github.com/redis/go-redis/v9"
-	"google.golang.org/grpc"
 	"time"
 )
 
@@ -19,6 +17,23 @@ type Limiter struct {
 	service  string
 }
 
+func (l *Limiter) Allow() bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	allow, err := l.client.Eval(ctx, luaFixWindow, []string{l.service},
+		l.interval.Milliseconds(), l.rate).Bool()
+	if err != nil {
+		return false
+	}
+
+	return allow
+}
+
+func (l *Limiter) Close() {
+	//TODO implement me
+}
+
 func NewLimiter(client redis.Cmdable, interval time.Duration, rate int, service string) *Limiter {
 	return &Limiter{
 		client:   client,
@@ -26,26 +41,4 @@ func NewLimiter(client redis.Cmdable, interval time.Duration, rate int, service 
 		rate:     rate,
 		service:  service,
 	}
-}
-
-func (f *Limiter) BuildServerInterceptor() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
-		// 不同限流粒度
-		allow, err := f.allow(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if !allow {
-			err = errors.New("rate-limit")
-			return
-		}
-
-		resp, err = handler(ctx, req)
-		return
-	}
-}
-
-func (f *Limiter) allow(ctx context.Context) (bool, error) {
-	return f.client.Eval(ctx, luaFixWindow, []string{f.service},
-		f.interval.Milliseconds(), f.rate).Bool()
 }

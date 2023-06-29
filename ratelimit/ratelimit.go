@@ -1,7 +1,7 @@
 package ratelimit
 
 import (
-	"errors"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -11,8 +11,14 @@ type Limiter interface {
 	Close()
 }
 
-func NewServerLimiter(limiter Limiter) grpc.UnaryServerInterceptor {
-	return BuildServerInterceptor(limiter)
+func NewServerLimiter(limiter Limiter) grpc.ServerOption {
+	interceptor := BuildServerInterceptor(limiter)
+	return grpc.UnaryInterceptor(interceptor)
+}
+
+func NewClientLimiter(limiter Limiter) grpc.DialOption {
+	interceptor := BuildClientInterceptor(limiter)
+	return grpc.WithUnaryInterceptor(interceptor)
 }
 
 func BuildServerInterceptor(limiter Limiter) grpc.UnaryServerInterceptor {
@@ -20,6 +26,16 @@ func BuildServerInterceptor(limiter Limiter) grpc.UnaryServerInterceptor {
 		if !limiter.Allow() {
 			return nil, errors.New("rate-limit")
 		}
-		return handler(ctx, req), nil
+		resp, err = handler(ctx, req)
+		return
+	}
+}
+
+func BuildClientInterceptor(limiter Limiter) grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		if !limiter.Allow() {
+			return errors.New("rate-limit")
+		}
+		return invoker(ctx, method, req, reply, cc, opts...)
 	}
 }

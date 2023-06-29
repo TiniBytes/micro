@@ -3,6 +3,7 @@ package micro
 import (
 	"context"
 	"google.golang.org/grpc"
+	"micro/middleware"
 	"micro/registry"
 	"net"
 	"time"
@@ -14,6 +15,7 @@ type Server struct {
 	registryTimeout time.Duration
 	listener        net.Listener
 	group           string
+	middleware      []middleware.Middleware
 	*grpc.Server
 }
 
@@ -30,7 +32,22 @@ func NewServer(name string, opts ...ServerOption) (*Server, error) {
 	for _, opt := range opts {
 		opt(res)
 	}
+
+	// 服务配置
+	serverOption := res.middlewareOption()
+	res.Server = grpc.NewServer(serverOption...)
+
 	return res, nil
+}
+
+func (s *Server) middlewareOption() []grpc.ServerOption {
+	var ans []grpc.ServerOption
+	for _, middle := range s.middleware {
+		interceptor := middleware.BuildServerInterceptor(middle)
+		option := grpc.UnaryInterceptor(interceptor)
+		ans = append(ans, option)
+	}
+	return ans
 }
 
 // Start 调用start任务服务准备好, 开始注册
@@ -84,5 +101,11 @@ func ServerWithRegister(r registry.Registry) ServerOption {
 func ServerWithGroup(group string) ServerOption {
 	return func(server *Server) {
 		server.group = group
+	}
+}
+
+func ServerWithMiddleware(middleware middleware.Middleware) ServerOption {
+	return func(server *Server) {
+		server.middleware = append(server.middleware, middleware)
 	}
 }

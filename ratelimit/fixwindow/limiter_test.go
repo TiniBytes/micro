@@ -6,12 +6,15 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"micro/demo/proto"
+	"micro/ratelimit"
 	"testing"
 	"time"
 )
 
 func TestNewLimiter(t *testing.T) {
-	interceptor := NewLimiter(3*time.Second, 1).BuildServerInterceptor()
+	limiter := NewLimiter(3*time.Second, 1)
+	interceptor := ratelimit.BuildServerInterceptor(limiter)
+	//interceptor := NewLimiter(3*time.Second, 1).BuildServerInterceptor()
 	cnt := 0
 
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {

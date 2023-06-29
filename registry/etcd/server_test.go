@@ -22,6 +22,9 @@ func TestRegistryEtcd(t *testing.T) {
 	server, err := micro.NewServer("user-service",
 		micro.ServerWithRegister(registry),
 		micro.ServerWithGroup("A"),
+		micro.ServerWithMiddleware(func() {
+			fmt.Println("AOP-拦截器")
+		}),
 	)
 	require.NoError(t, err)
 	proto.RegisterUserServiceServer(server, us)

@@ -7,6 +7,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"micro/demo/proto"
+	"micro/ratelimit"
 	"testing"
 	"time"
 )
@@ -15,7 +16,10 @@ func TestSlideWindowLimiter(t *testing.T) {
 	client := redis.NewClient(&redis.Options{
 		Addr: "127.0.0.1:6379",
 	})
-	interceptor := NewSlideWindowLimiter(client, 3*time.Second, 1, "user-service").BuildServerInterceptor()
+
+	limiter := NewLimiter(client, 3*time.Second, 1, "user-service")
+	interceptor := ratelimit.BuildServerInterceptor(limiter)
+	//interceptor := NewLimiter(client, 3*time.Second, 1, "user-service").BuildServerInterceptor()
 	cnt := 0
 
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
